@@ -1,4 +1,5 @@
-﻿using DSharpPlus;
+﻿using DiscordBot.Core.Commands;
+using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.EventArgs;
 using DSharpPlus.Interactivity;
@@ -6,7 +7,6 @@ using DSharpPlus.Interactivity.Extensions;
 using Newtonsoft.Json;
 using System.Text;
 using System.Text.Json;
-using DiscordBot.Core.Commands;
 
 namespace DiscordBot.Core
 {
@@ -21,21 +21,29 @@ namespace DiscordBot.Core
 
     public class CoolBot
     {
-
-        public DiscordClient? Client { get; private set; }
-        public InteractivityExtension? Interactivity { get; private set; }
-        public CommandsNextExtension? Commands { get; private set; }
+        private DiscordClient? _discordBot { get; set; }
+        private InteractivityExtension? _interactivityExtension { get; set; }
+        private CommandsNextExtension? _commandsExtension { get; set; }
 
         public bool InitBot()
         {
-            var json = string.Empty;
+            string configContents = string.Empty;
 
-            using (var fs = File.OpenRead("config.json"))
-            using (var sr = new StreamReader(fs, new UTF8Encoding(false)))
-                json = sr.ReadToEnd();
+            try
+            {
+                // Parse config.json data into configContents
+                FileStream fileStream = File.OpenRead("config.json");
+                StreamReader streamReader = new StreamReader(fileStream, new UTF8Encoding(false));
 
-            var configJson = JsonConvert.DeserializeObject<ConfigJson>(json);
-
+                configContents = streamReader.ReadToEnd();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Failed to initialise bot - {0}", e.Message );
+                return false;
+            }
+            
+            ConfigJson configJson = JsonConvert.DeserializeObject<ConfigJson>(configContents);
 
             var config = new DiscordConfiguration
             {
@@ -45,16 +53,19 @@ namespace DiscordBot.Core
                 AutoReconnect = true,
             };
 
-            Client = new DiscordClient(config);
+            _discordBot = new DiscordClient(config);
 
-            // What to do when bot turns on
-            Client.Ready += OnClientReady;
+            // Set function called when bot ready
+            _discordBot.Ready += OnBotReady;
 
-            Client.UseInteractivity(new InteractivityConfiguration
+            // Enable Interactivity extension
+            _discordBot.UseInteractivity(new InteractivityConfiguration
             {
+                // Allow up to 2 minutes when waiting for user response
                 Timeout = TimeSpan.FromMinutes(2)
             });
 
+            // Configure and create the Commands extension
             var commandsConfig = new CommandsNextConfiguration
             {
                 StringPrefixes = new string[] { configJson.Prefix },
@@ -62,26 +73,23 @@ namespace DiscordBot.Core
                 EnableMentionPrefix = false,
                 DmHelp = true,
             };
+            _commandsExtension = _discordBot.UseCommandsNext(commandsConfig);
 
-            Commands = Client.UseCommandsNext(commandsConfig);
-
-            // Register all commands in Commands classes
-            Commands.RegisterCommands<FunCommands>();
-            Commands.RegisterCommands<TeamCommands>();
+            // Register all possible bot commands
+            _commandsExtension.RegisterCommands<SimpleCommands>();
+            _commandsExtension.RegisterCommands<TeamCommands>();
 
             return true;
         }
 
         public async Task RunBot()
         {
-            await Client.ConnectAsync();
+            await _discordBot.ConnectAsync();
 
             await Task.Delay(-1);
         }
 
-
-
-        private Task OnClientReady(DiscordClient client, ReadyEventArgs e)
+        private Task OnBotReady(DiscordClient client, ReadyEventArgs e)
         {
             return Task.CompletedTask;
         }
