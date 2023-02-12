@@ -7,10 +7,11 @@ using DSharpPlus.Interactivity.Extensions;
 using Newtonsoft.Json;
 using System.Text;
 using System.Text.Json;
+using DSharpPlus.VoiceNext;
 
 namespace DiscordBot.Core
 {
-    public struct ConfigJson
+    public struct ConfigData
     {
         [JsonProperty("token")]
         public string Token { get; private set; }
@@ -24,6 +25,7 @@ namespace DiscordBot.Core
         private DiscordClient? _discordBot { get; set; }
         private InteractivityExtension? _interactivityExtension { get; set; }
         private CommandsNextExtension? _commandsExtension { get; set; }
+        private VoiceNextExtension _voiceExtension { get; set; }
 
         public bool InitBot()
         {
@@ -42,8 +44,8 @@ namespace DiscordBot.Core
                 Console.WriteLine("Failed to initialise bot - {0}", e.Message );
                 return false;
             }
-            
-            ConfigJson configJson = JsonConvert.DeserializeObject<ConfigJson>(configContents);
+
+            ConfigData configJson = JsonConvert.DeserializeObject<ConfigData>(configContents);
 
             var config = new DiscordConfiguration
             {
@@ -64,7 +66,7 @@ namespace DiscordBot.Core
                 // Allow up to 2 minutes when waiting for user response
                 Timeout = TimeSpan.FromMinutes(2)
             });
-
+            
             // Configure and create the Commands extension
             var commandsConfig = new CommandsNextConfiguration
             {
@@ -74,6 +76,8 @@ namespace DiscordBot.Core
                 DmHelp = true,
             };
             _commandsExtension = _discordBot.UseCommandsNext(commandsConfig);
+
+            _voiceExtension = _discordBot.UseVoiceNext();
 
             // Register all possible bot commands
             _commandsExtension.RegisterCommands<SimpleCommands>();
