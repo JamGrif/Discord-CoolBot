@@ -1,6 +1,8 @@
 ﻿using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
+using DSharpPlus.Entities;
 using DSharpPlus.Interactivity.Extensions;
+
 
 namespace DiscordBot.Core.Commands
 {
@@ -44,7 +46,30 @@ namespace DiscordBot.Core.Commands
             await context.Channel.SendMessageAsync(message.Result.Emoji);
         }
 
+        [Command("poll")]
+        public async Task Poll(CommandContext context, TimeSpan duration, params DiscordEmoji[] emojiOptions)
+        {
+            var interactivity = context.Client.GetInteractivity();
 
+            var options = emojiOptions.Select(x => x.ToString());
 
+            var pollEmbed = new DiscordEmbedBuilder
+            {
+                Title = "Poll",
+                Description = string.Join(" ", options),
+            };
+
+            var pollMessage = await context.Channel.SendMessageAsync(embed: pollEmbed);
+
+            foreach (var item in emojiOptions)
+            {
+                await pollMessage.CreateReactionAsync(item);
+            }
+
+            var result = await interactivity.CollectReactionsAsync(pollMessage, duration);
+            var results = result.Select(x => $"{x.Emoji}: {x.Total}");
+
+            await context.Channel.SendMessageAsync(string.Join("\n", results));
+        }
     }
 }
