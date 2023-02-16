@@ -25,7 +25,7 @@ namespace DiscordBot.Core
         private DiscordClient? _discordBot { get; set; }
         private InteractivityExtension? _interactivityExtension { get; set; }
         private CommandsNextExtension? _commandsExtension { get; set; }
-        private VoiceNextExtension _voiceExtension { get; set; }
+        private VoiceNextExtension _voiceNextExtension { get; set; }
 
         public bool InitBot()
         {
@@ -77,11 +77,11 @@ namespace DiscordBot.Core
             };
             _commandsExtension = _discordBot.UseCommandsNext(commandsConfig);
 
-            _voiceExtension = _discordBot.UseVoiceNext();
+            _voiceNextExtension = _discordBot.UseVoiceNext();
 
             // Register all possible bot commands
             _commandsExtension.RegisterCommands<SimpleCommands>();
-            _commandsExtension.RegisterCommands<TeamCommands>();
+            _commandsExtension.RegisterCommands<VoiceCommands>();
 
             return true;
         }

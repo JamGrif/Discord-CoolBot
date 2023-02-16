@@ -3,7 +3,6 @@ using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using DSharpPlus.Interactivity.Extensions;
 
-
 namespace DiscordBot.Core.Commands
 {
     public class SimpleCommands :
