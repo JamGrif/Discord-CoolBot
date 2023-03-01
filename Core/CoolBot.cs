@@ -9,9 +9,11 @@ using System.Text;
 using System.Text.Json;
 using DSharpPlus.VoiceNext;
 
+
 namespace DiscordBot.Core
 {
-    public struct ConfigData
+    // Used to deserialize config.json to connect bot to Discord
+    public struct ConfigBotData
     {
         [JsonProperty("token")]
         public string Token { get; private set; }
@@ -25,12 +27,13 @@ namespace DiscordBot.Core
         private DiscordClient? _discordBot { get; set; }
         private InteractivityExtension? _interactivityExtension { get; set; }
         private CommandsNextExtension? _commandsExtension { get; set; }
-        private VoiceNextExtension _voiceNextExtension { get; set; }
+        private VoiceNextExtension? _voiceNextExtension { get; set; }
+
+        public static VoiceNextConnection? CurrentConnection { get; set; }
 
         public bool InitBot()
         {
             string configContents = string.Empty;
-
             try
             {
                 // Parse config.json data into configContents
@@ -41,23 +44,22 @@ namespace DiscordBot.Core
             }
             catch (Exception e)
             {
-                Console.WriteLine("Failed to initialise bot - {0}", e.Message );
+                Console.WriteLine($"Failed to initialise bot - {e.Message}");
                 return false;
             }
 
-            ConfigData configJson = JsonConvert.DeserializeObject<ConfigData>(configContents);
+            ConfigBotData configBotData = JsonConvert.DeserializeObject<ConfigBotData>(configContents);
 
-            var config = new DiscordConfiguration
+            // Create the bot client and set initial configuration
+            _discordBot = new DiscordClient(new DiscordConfiguration
             {
                 Intents = DiscordIntents.AllUnprivileged | DiscordIntents.MessageContents,
-                Token = configJson.Token,
+                Token = configBotData.Token,
                 TokenType = TokenType.Bot,
                 AutoReconnect = true,
-            };
+            });
 
-            _discordBot = new DiscordClient(config);
-
-            // Set function called when bot ready
+            // Set function which is called when bot is ready
             _discordBot.Ready += OnBotReady;
 
             // Enable Interactivity extension
@@ -67,30 +69,43 @@ namespace DiscordBot.Core
                 Timeout = TimeSpan.FromMinutes(2)
             });
             
-            // Configure and create the Commands extension
-            var commandsConfig = new CommandsNextConfiguration
+            // Enable Commands extension and set initial configuration
+            _commandsExtension = _discordBot.UseCommandsNext(new CommandsNextConfiguration
             {
-                StringPrefixes = new string[] { configJson.Prefix },
+                StringPrefixes = new string[] { configBotData.Prefix },
                 EnableDms = false,
                 EnableMentionPrefix = false,
                 DmHelp = true,
-            };
-            _commandsExtension = _discordBot.UseCommandsNext(commandsConfig);
+            });
 
+            // Enable Voice extension
             _voiceNextExtension = _discordBot.UseVoiceNext();
 
             // Register all possible bot commands
             _commandsExtension.RegisterCommands<SimpleCommands>();
             _commandsExtension.RegisterCommands<VoiceCommands>();
 
+            VoiceCommands.songQueue = new Queue<string>();
+
             return true;
         }
 
         public async Task RunBot()
         {
+            if (_discordBot == null)
+                return;
+
             await _discordBot.ConnectAsync();
 
-            await Task.Delay(-1);
+            // Keep bot online until told to close by another source
+            while (true)
+            {
+                // Check song queue every three seconds
+                if (!VoiceCommands.songPlaying && VoiceCommands.songQueue?.Count > 0)
+                    await VoiceCommands.PlayNextInQueue();
+                
+                await Task.Delay(2000);
+            }
         }
 
         private Task OnBotReady(DiscordClient client, ReadyEventArgs e)
